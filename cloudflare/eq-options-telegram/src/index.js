@@ -1,6 +1,20 @@
 export default {
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil(ingestLatestBars(env));
+  },
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (request.method === "GET" && url.pathname === "/api/markets") {
+      if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+        return Response.json({ok:false,status:"unavailable",reason:"database_not_configured"}, {status:503});
+      }
+      try {
+        const rows = await readLatestBars(env);
+        return Response.json({ok:true,status:rows.length ? "available" : "empty",bars:rows});
+      } catch {
+        return Response.json({ok:false,status:"unavailable",reason:"database_request_failed"}, {status:503});
+      }
+    }
     if (request.method === "GET" && url.pathname === "/health") {
       return Response.json({ok:true,service:"eq-options-telegram",brand:"EQ Options",telegramConfigured:Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_WEBHOOK_SECRET)});
     }
@@ -25,7 +39,7 @@ export default {
       start: "Welcome to EQ Options 👋\n\nYour home for experimental forex and gold market research.\n\nChoose an option below to get started. Forecasts are not guaranteed, and this bot does not place trades.",
       help: helpText,
       forecast: "📊 Forecast status\n\nThe forecasting service is being prepared. Live market data and validated forecasts are not connected yet, so we won’t invent a signal. We’ll show forecasts only after data and evaluation checks are in place.",
-      markets: "💹 Market coverage\n\nLive market feeds are not connected yet. Planned coverage includes major FX pairs and gold (XAUUSD). We’ll identify the data source and freshness before presenting market values.",
+      markets: "💹 Market coverage\n\nChecking the latest stored market data…",
       brokers: "🤝 Broker links\n\nNo broker links are configured yet. Any future affiliate links will be clearly disclosed. EQ Options does not need your broker password or one-time codes.",
       referral_status: "👤 Referral status\n\nReferral verification is not connected yet. A click or submitted account ID does not prove registration or qualification. We’ll only mark referrals verified using authoritative broker evidence."
     };
@@ -81,13 +95,112 @@ export default {
     }
     const key = action === "back" ? "start" : action;
     const replyMarkup = {keyboard:replyKeyboard.keyboard,resize_keyboard:true,is_persistent:true,input_field_placeholder:"Choose an option…"};
+    let responseText = messages[key];
+    if (key === "markets") {
+      try {
+        if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+          responseText = "💹 Market coverage\n\nMarket data is not configured yet. No prices are being displayed as live.";
+        } else {
+          const rows = await readLatestBars(env);
+          responseText = formatMarketSnapshot(rows);
+        }
+      } catch {
+        responseText = "💹 Market coverage\n\nMarket data is temporarily unavailable. Please try again later.";
+      }
+    }
+    const inline = key === "markets" ? {inline_keyboard:[
+      [{text:"🔄 Refresh",callback_data:"markets"},{text:"📊 Forecast status",callback_data:"forecast"}],
+      [{text:"ℹ️ Help",callback_data:"help"}]
+    ]} : undefined;
     await telegram("sendMessage",{
       chat_id:chatId,
-      text:messages[key],
-      reply_markup:replyMarkup,
+      text:responseText,
+      reply_markup:inline ? {...replyMarkup, ...inline} : replyMarkup,
       disable_web_page_preview:true
     });
     return new Response("OK");
   }
 };
 function constantTimeEqual(a,b){const e=new TextEncoder(),x=e.encode(a),y=e.encode(b);if(x.length!==y.length)return false;let d=0;for(let i=0;i<x.length;i++)d|=x[i]^y[i];return d===0;}
+
+async function readLatestBars(env) {
+  const base = env.SUPABASE_URL.replace(/\/$/, "");
+  const query = new URLSearchParams({
+    select: "instrument,timeframe,open_time,open_price,high_price,low_price,close_price,source,received_at",
+    timeframe: "eq.M1",
+    order: "open_time.desc",
+    limit: "100"
+  });
+  const response = await fetch(base + "/rest/v1/market_bars?" + query.toString(), {
+    headers: {apikey:env.SUPABASE_SERVICE_ROLE_KEY, Authorization:"Bearer " + env.SUPABASE_SERVICE_ROLE_KEY}
+  });
+  if (!response.ok) throw new Error("Market data query failed");
+  const rows = await response.json();
+  const latest = new Map();
+  for (const row of rows) if (!latest.has(row.instrument)) latest.set(row.instrument, row);
+  return Array.from(latest.values());
+}
+function formatMarketSnapshot(rows) {
+  if (!rows.length) return "💹 Market coverage\n\nNo market candles have been stored yet. The feed is not confirmed live, so no price is shown.";
+  const now = Date.now();
+  const lines = rows.map(row => {
+    const age = Math.max(0, Math.round((now - Date.parse(row.open_time)) / 60000));
+    const freshness = age <= 3 ? "FRESH" : age <= 10 ? "DELAYED" : "STALE";
+    return (row.instrument === "XAUUSD" ? "🟡 " : "💱 ") + row.instrument + " — " + Number(row.close_price).toString() +
+      "\n   " + row.timeframe + " · " + freshness + " · candle " + row.open_time;
+  });
+  return "💹 Latest stored market candles\n\n" + lines.join("\n\n") +
+    "\n\nSource: provider recorded in database. These are market snapshots, not trading signals.";
+}
+async function ingestLatestBars(env) {
+  if (!env.TWELVEDATA_API_KEY || !env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.log("Market ingestion skipped: required provider/database secrets are not configured.");
+    return;
+  }
+  const instruments = ["EUR/USD", "GBP/USD", "USD/JPY", "XAU/USD"];
+  for (const symbol of instruments) {
+    const started = Date.now();
+    let healthy = false;
+    try {
+      const params = new URLSearchParams({
+        symbol, interval:"1min", outputsize:"3", order:"ASC", timezone:"UTC", apikey:env.TWELVEDATA_API_KEY
+      });
+      const response = await fetch("https://api.twelvedata.com/time_series?" + params.toString());
+      const payload = await response.json();
+      if (!response.ok || payload.status === "error" || !Array.isArray(payload.values)) {
+        throw new Error("Provider returned no usable candle values");
+      }
+      const bars = payload.values.map(row => {
+        const open = Number(row.open), high = Number(row.high), low = Number(row.low), close = Number(row.close);
+        const time = new Date(row.datetime.replace(" ", "T") + "Z");
+        if (![open,high,low,close].every(Number.isFinite) || Math.min(open,high,low,close) <= 0 ||
+            high < Math.max(open,close,low) || low > Math.min(open,close,high) || Number.isNaN(time.getTime())) {
+          throw new Error("Provider returned malformed OHLC data");
+        }
+        return {instrument:symbol.replace("/",""), timeframe:"M1", open_time:time.toISOString(),
+          open_price:open, high_price:high, low_price:low, close_price:close,
+          volume:row.volume ? Number(row.volume) : null, source:"twelvedata", received_at:new Date().toISOString()};
+      });
+      const base = env.SUPABASE_URL.replace(/\/$/, "");
+      const responseDb = await fetch(base + "/rest/v1/market_bars?on_conflict=instrument,timeframe,open_time,source", {
+        method:"POST",
+        headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:"Bearer " + env.SUPABASE_SERVICE_ROLE_KEY,
+          "Content-Type":"application/json",Prefer:"resolution=ignore-duplicates,return=minimal"},
+        body:JSON.stringify(bars)
+      });
+      if (!responseDb.ok) throw new Error("Database rejected market bars");
+      healthy = true;
+    } catch (error) {
+      console.log("Ingestion failed for", symbol, error instanceof Error ? error.message : "unknown error");
+    }
+    try {
+      await fetch(env.SUPABASE_URL.replace(/\/$/, "") + "/rest/v1/data_source_health", {
+        method:"POST",
+        headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:"Bearer " + env.SUPABASE_SERVICE_ROLE_KEY,
+          "Content-Type":"application/json",Prefer:"return=minimal"},
+        body:JSON.stringify([{source:"twelvedata",instrument:symbol.replace("/",""),healthy,
+          latency_ms:Date.now()-started,details:{interval:"1min"}}])
+      });
+    } catch { /* keep scheduled ingestion isolated per instrument */ }
+  }
+}
