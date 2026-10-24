@@ -24,10 +24,10 @@ export default {
     let update; try { update=await request.json(); } catch { return new Response("Bad JSON",{status:400}); }
     const message=update?.message; const chatId=message?.chat?.id; const text=typeof message?.text==="string"?message.text.trim():"";
     if(!chatId||!text.startsWith("/")) return new Response("OK");
-    const command=text.split(/\\s+/,1)[0].split("@")[0].toLowerCase(); let reply;
+    const command=text.split(/\s+/,1)[0].split("@")[0].toLowerCase(); let reply;
     switch(command){
-      case "/start": reply="Welcome to EQ Options.\\n\\nExperimental forex and gold market research — not financial advice. Forecasts can be wrong and are not guaranteed. No live trading is available.\\n\\nCommands: /help /brokers /referral_status /forecast";break;
-      case "/help": reply="/start — introduction\\n/forecast — forecast service status\\n/brokers — configured broker links\\n/referral_status — referral verification status\\n\\nEQ Options is for research only. No live trading or guaranteed-profit claims.";break;
+      case "/start": reply="Welcome to EQ Options.\n\nExperimental forex and gold market research — not financial advice. Forecasts can be wrong and are not guaranteed. No live trading is available.\n\nCommands: /help /brokers /referral_status /forecast";break;
+      case "/help": reply="/start — introduction\n/forecast — forecast service status\n/brokers — configured broker links\n/referral_status — referral verification status\n\nEQ Options is for research only. No live trading or guaranteed-profit claims.";break;
       case "/forecast": reply="Forecast service is being prepared. Live market data and validated forecasts are not connected yet, so EQ Options will not invent a live signal. Please check back later.";break;
       case "/brokers": reply="No broker links are configured yet. Any future affiliate links will be clearly disclosed.";break;
       case "/referral_status": reply="Broker referral verification is not connected yet. A click or submitted account ID does not prove registration or qualification. We will not mark referrals verified without authoritative broker evidence.";break;
