@@ -15,9 +15,20 @@ export default {
         const diagnostic = error instanceof Error ? error.message : "unknown_database_error";
         const key = typeof env.SUPABASE_SERVICE_ROLE_KEY === "string" ? env.SUPABASE_SERVICE_ROLE_KEY.trim() : "";
         const url = typeof env.SUPABASE_URL === "string" ? env.SUPABASE_URL.trim() : "";
+        const jwtClaims = (() => {
+          try {
+            if (!key.startsWith("eyJ")) return null;
+            const segment = key.split(".")[1];
+            if (!segment) return null;
+            const normalized = segment.replace(/-/g, "+").replace(/_/g, "/");
+            return JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=")));
+          } catch { return null; }
+        })();
         const safeDiagnostics = {
           key_kind: key.startsWith("sb_secret_") ? "modern_secret" : key.startsWith("eyJ") ? "legacy_jwt" : key ? "unknown_format" : "missing",
           key_length: key.length,
+          jwt_role: typeof jwtClaims?.role === "string" ? jwtClaims.role : "not_detected",
+          jwt_project_ref: typeof jwtClaims?.ref === "string" ? jwtClaims.ref : "not_present",
           url_project_ref: (() => { try { return new URL(url).hostname.split(".")[0]; } catch { return "invalid_url"; } })()
         };
         console.error("Market API database failure", diagnostic, safeDiagnostics);
