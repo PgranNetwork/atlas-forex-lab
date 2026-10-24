@@ -45,7 +45,17 @@ export default {
         const response = await fetch(base + "/rest/v1/data_source_health?" + query.toString(), {headers:supabaseHeaders(env)});
         if (!response.ok) throw new Error("health_query_http_" + response.status);
         const rows = await response.json();
-        return Response.json({ok:true,status:rows.length ? "records_found" : "no_records",checks:rows});
+        return Response.json({
+          ok:true,
+          status:rows.length ? "records_found" : "no_records",
+          configuration:{
+            supabase_url_present:Boolean(env.SUPABASE_URL),
+            supabase_key_present:Boolean(env.SUPABASE_SERVICE_ROLE_KEY),
+            twelve_data_key_present:Boolean(env.TWELVEDATA_API_KEY),
+            url_project_ref:(() => { try { return new URL(env.SUPABASE_URL).hostname.split(".")[0]; } catch { return "invalid_url"; } })()
+          },
+          checks:rows
+        });
       } catch (error) {
         return Response.json({ok:false,status:"unavailable",reason:error instanceof Error ? error.message : "health_query_failed"},{status:503});
       }
