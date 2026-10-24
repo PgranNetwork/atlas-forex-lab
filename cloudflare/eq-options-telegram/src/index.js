@@ -71,13 +71,23 @@ export default {
       await telegram("answerCallbackQuery", {callback_query_id:cq.id});
       const chatId = cq.message?.chat?.id;
       if (!chatId) return new Response("OK");
-      const key = action === "start" ? "start" : (action && messages[action] ? action : "help");
-      await telegram("sendMessage", {
-        chat_id:chatId,
-        text:messages[key],
-        reply_markup:{keyboard:replyKeyboard.keyboard,resize_keyboard:true,is_persistent:true,input_field_placeholder:"Choose an option…"},
-        disable_web_page_preview:true
-      });
+      const key = action === "back" ? "start" : (action && messages[action] ? action : "help");
+      let responseText = messages[key];
+      let markup = {keyboard:replyKeyboard.keyboard,resize_keyboard:true,is_persistent:true,input_field_placeholder:"Choose an option…"};
+      if (key === "markets") {
+        try {
+          responseText = (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY)
+            ? "💹 Market coverage\\n\\nMarket data is not configured yet. No prices are being displayed as live."
+            : formatMarketSnapshot(await readLatestBars(env));
+        } catch {
+          responseText = "💹 Market coverage\\n\\nMarket data is temporarily unavailable. Please try again later.";
+        }
+        markup = {inline_keyboard:[
+          [{text:"🔄 Refresh",callback_data:"markets"},{text:"📊 Forecast status",callback_data:"forecast"}],
+          [{text:"⬅️ Back",callback_data:"start"},{text:"🏠 Main menu",callback_data:"start"}]
+        ]};
+      }
+      await telegram("sendMessage", {chat_id:chatId,text:responseText,reply_markup:markup,disable_web_page_preview:true});
       return new Response("OK");
     }
     const message=update?.message;
