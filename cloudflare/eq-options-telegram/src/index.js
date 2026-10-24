@@ -33,12 +33,18 @@ export default {
         const barRows = await barsResponse.json();
         const coverage = {};
         for (const row of barRows) {
-          if (!coverage[row.instrument]) coverage[row.instrument] = {bars_in_latest_1000:0,latest_bar_at:row.open_time,latest_received_at:row.received_at};
-          coverage[row.instrument].bars_in_latest_1000 += 1;
+          if (!coverage[row.instrument]) coverage[row.instrument] = {
+            bars_in_latest_1000:0,latest_bar_at:row.open_time,latest_received_at:row.received_at,
+            gap_count_over_90_seconds:0,last_seen_open_time:row.open_time
+          };
+          const item = coverage[row.instrument];
+          if (Date.parse(item.last_seen_open_time) - Date.parse(row.open_time) > 90000) item.gap_count_over_90_seconds += 1;
+          item.last_seen_open_time = row.open_time;
+          item.bars_in_latest_1000 += 1;
         }
         for (const value of Object.values(coverage)) {
           value.age_minutes = Math.max(0, Math.round((Date.now() - Date.parse(value.latest_bar_at)) / 60000));
-          value.gap_count_over_90_seconds = 0;
+          delete value.last_seen_open_time;
         }
         return Response.json({
           ok:true,
