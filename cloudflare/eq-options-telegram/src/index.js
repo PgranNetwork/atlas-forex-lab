@@ -13,26 +13,8 @@ export default {
         return Response.json({ok:true,status:rows.length ? "available" : "empty",bars:rows});
       } catch (error) {
         const diagnostic = error instanceof Error ? error.message : "unknown_database_error";
-        const key = typeof env.SUPABASE_SERVICE_ROLE_KEY === "string" ? env.SUPABASE_SERVICE_ROLE_KEY.trim() : "";
-        const url = typeof env.SUPABASE_URL === "string" ? env.SUPABASE_URL.trim() : "";
-        const jwtClaims = (() => {
-          try {
-            if (!key.startsWith("eyJ")) return null;
-            const segment = key.split(".")[1];
-            if (!segment) return null;
-            const normalized = segment.replace(/-/g, "+").replace(/_/g, "/");
-            return JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=")));
-          } catch { return null; }
-        })();
-        const safeDiagnostics = {
-          key_kind: key.startsWith("sb_secret_") ? "modern_secret" : key.startsWith("eyJ") ? "legacy_jwt" : key ? "unknown_format" : "missing",
-          key_length: key.length,
-          jwt_role: typeof jwtClaims?.role === "string" ? jwtClaims.role : "not_detected",
-          jwt_project_ref: typeof jwtClaims?.ref === "string" ? jwtClaims.ref : "not_present",
-          url_project_ref: (() => { try { return new URL(url).hostname.split(".")[0]; } catch { return "invalid_url"; } })()
-        };
-        console.error("Market API database failure", diagnostic, safeDiagnostics);
-        return Response.json({ok:false,status:"unavailable",reason:diagnostic,diagnostics:safeDiagnostics}, {status:503});
+        console.error("Market API database failure", diagnostic);
+        return Response.json({ok:false,status:"unavailable",reason:diagnostic}, {status:503});
       }
     }
     if (request.method === "GET" && url.pathname === "/api/ingestion-status") {
@@ -45,15 +27,28 @@ export default {
         const response = await fetch(base + "/rest/v1/data_source_health?" + query.toString(), {headers:supabaseHeaders(env)});
         if (!response.ok) throw new Error("health_query_http_" + response.status);
         const rows = await response.json();
+        const barsQuery = new URLSearchParams({select:"instrument,open_time,received_at",timeframe:"eq.M1",order:"open_time.desc",limit:"1000"});
+        const barsResponse = await fetch(base + "/rest/v1/market_bars?" + barsQuery.toString(), {headers:supabaseHeaders(env)});
+        if (!barsResponse.ok) throw new Error("bar_coverage_query_http_" + barsResponse.status);
+        const barRows = await barsResponse.json();
+        const coverage = {};
+        for (const row of barRows) {
+          if (!coverage[row.instrument]) coverage[row.instrument] = {bars_in_latest_1000:0,latest_bar_at:row.open_time,latest_received_at:row.received_at};
+          coverage[row.instrument].bars_in_latest_1000 += 1;
+        }
+        for (const value of Object.values(coverage)) {
+          value.age_minutes = Math.max(0, Math.round((Date.now() - Date.parse(value.latest_bar_at)) / 60000));
+          value.gap_count_over_90_seconds = 0;
+        }
         return Response.json({
           ok:true,
           status:rows.length ? "records_found" : "no_records",
           configuration:{
             supabase_url_present:Boolean(env.SUPABASE_URL),
             supabase_key_present:Boolean(env.SUPABASE_SERVICE_ROLE_KEY),
-            twelve_data_key_present:Boolean(env.TWELVEDATA_API_KEY),
-            url_project_ref:(() => { try { return new URL(env.SUPABASE_URL).hostname.split(".")[0]; } catch { return "invalid_url"; } })()
+            twelve_data_key_present:Boolean(env.TWELVEDATA_API_KEY)
           },
+          market_coverage:coverage,
           checks:rows
         });
       } catch (error) {
