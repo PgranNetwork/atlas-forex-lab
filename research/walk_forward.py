@@ -62,18 +62,27 @@ def evaluate(
     spread_bps: float = 1.0,
     commission_bps: float = 0.0,
     slippage_bps: float = 1.0,
+    test_fraction: float = 0.2,
 ) -> dict:
     if lookback < 1 or horizon < 1:
         raise ValueError("lookback and horizon must be positive")
     if min(spread_bps, commission_bps, slippage_bps) < 0:
         raise ValueError("cost assumptions cannot be negative")
+    if not 0 < test_fraction < 1:
+        raise ValueError("test_fraction must be between 0 and 1")
     cost_bps = spread_bps + commission_bps + slippage_bps
     grouped: dict[str, list[Bar]] = {}
     for bar in bars:
         grouped.setdefault(bar.instrument, []).append(bar)
     outcomes: list[dict] = []
+    holdout_start_by_instrument: dict[str, str] = {}
+    gap_counts: dict[str, int] = {}
     for instrument, series in grouped.items():
-        for origin in range(lookback, len(series) - horizon):
+        split = max(lookback + 1, int(len(series) * (1.0 - test_fraction)))
+        holdout_start_by_instrument[instrument] = series[min(split, len(series) - 1)].timestamp.isoformat() if series else ""
+        gaps = sum(1 for left, right in zip(series, series[1:]) if (right.timestamp - left.timestamp).total_seconds() > 90)
+        gap_counts[instrument] = gaps
+        for origin in range(max(lookback, split), len(series) - horizon):
             # Only information up to and including origin is used to create the signal.
             prior = series[origin - lookback].close
             current = series[origin].close
@@ -100,6 +109,9 @@ def evaluate(
         "strategy": "rolling_momentum_baseline",
         "lookback_bars": lookback,
         "horizon_bars": horizon,
+        "holdout_fraction": test_fraction,
+        "holdout_start_by_instrument": holdout_start_by_instrument,
+        "gap_count_over_90_seconds_by_instrument": gap_counts,
         "assumed_round_trip_cost_bps": cost_bps,
         "forecast_count": len(outcomes),
         "active_signal_count": len(active),
@@ -121,9 +133,10 @@ def main() -> None:
     parser.add_argument("--spread-bps", type=float, default=1.0)
     parser.add_argument("--commission-bps", type=float, default=0.0)
     parser.add_argument("--slippage-bps", type=float, default=1.0)
+    parser.add_argument("--test-fraction", type=float, default=0.2, help="Chronological holdout fraction per instrument")
     parser.add_argument("--out", type=Path, help="Optional JSON report output path")
     args = parser.parse_args()
-    result = evaluate(load_bars(args.csv), args.lookback, args.horizon, args.spread_bps, args.commission_bps, args.slippage_bps)
+    result = evaluate(load_bars(args.csv), args.lookback, args.horizon, args.spread_bps, args.commission_bps, args.slippage_bps, args.test_fraction)
     rendered = json.dumps(result, indent=2)
     if args.out:
         args.out.write_text(rendered + "\\n", encoding="utf-8")
