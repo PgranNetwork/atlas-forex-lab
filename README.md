@@ -5,13 +5,16 @@ Open-source, research-only Telegram assistant for forex and gold market analysis
 ## Current implementation
 
 - Typed market-data contract with validation for timestamps, OHLC bars and quotes.
+- Twelve Data REST adapter for forex and XAU/USD candles with strict response validation.
+- Server-side Supabase REST writer for market bars and data-source health telemetry.
+- `atlas ingest-live` command that fetches real provider data and persists it only after validation.
 - Deterministic synthetic data provider for demos and tests.
 - Transparent momentum heuristic for 1–5 one-minute bars ahead.
 - Optional Telegram command layer with /start, /help, /brokers and /referral_status.
 - Environment-based configuration; broker links must be explicitly configured.
 - GitHub Actions test workflow.
 
-Not yet implemented in this repository: live market-data feed, broker-specific affiliate conversion adapter, persistent production referral service, trained AI model, walk-forward backtester, Supabase integration, Cloudflare deployment and live bot configuration.
+Not yet implemented in this repository: scheduled production ingestion, Telegram-to-data-service runtime wiring, broker-specific affiliate conversion adapter, persistent production referral service, trained AI model, walk-forward backtester, and forecast-to-Telegram integration. The provider adapter requires a valid Twelve Data API key; the database writer requires server-side Supabase credentials.
 
 IMPORTANT: synthetic-data demos are not evidence of forecasting skill. The baseline is a heuristic, not a trained AI model. Referral status remains unverified until authoritative broker reporting is integrated. Do not use this software as financial advice or for unattended live trading.
 
@@ -35,6 +38,15 @@ To enable Telegram commands, install the optional dependency and configure the t
 On Windows PowerShell, set the variable with $env:ATLAS_TELEGRAM_BOT_TOKEN="your-token" instead of export.
 
 Copy .env.example for reference, but do not commit actual tokens, API keys, broker credentials, or account identifiers.
+
+### Live market ingestion
+
+Configure `TWELVEDATA_API_KEY`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY` in the trusted server environment only. Use the Supabase service-role key only in a private backend; never expose it in Telegram, a browser, a public repository, or a client app. Then run:
+
+    atlas ingest-live --instrument EURUSD --timeframe M1 --bars 100
+    atlas ingest-live --instrument XAUUSD --timeframe M1 --bars 100
+
+The command fails closed if credentials are missing, the provider errors, or candles fail validation. Provider availability, subscription limits, instrument coverage, and timestamps must be checked against the provider account before scheduling ingestion. This command is an ingestion primitive, not a continuous production scheduler.
 
 ## Engineering principles
 
