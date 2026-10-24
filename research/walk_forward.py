@@ -66,8 +66,9 @@ def evaluate(
 ) -> dict:
     if lookback < 1 or horizon < 1:
         raise ValueError("lookback and horizon must be positive")
-    if min(spread_bps, commission_bps, slippage_bps) < 0:
-        raise ValueError("cost assumptions cannot be negative")
+    costs = (spread_bps, commission_bps, slippage_bps)
+    if not all(math.isfinite(value) for value in costs) or min(costs) < 0:
+        raise ValueError("cost assumptions must be finite and non-negative")
     if not 0 < test_fraction < 1:
         raise ValueError("test_fraction must be between 0 and 1")
     cost_bps = spread_bps + commission_bps + slippage_bps
@@ -120,6 +121,8 @@ def evaluate(
         "mean_gross_return_bps": round(sum(gross) / len(gross), 5) if gross else None,
         "mean_net_return_bps": round(sum(net) / len(net), 5) if net else None,
         "total_net_return_bps_simple_sum": round(sum(net), 5) if net else None,
+        "zero_signal_baseline_total_return_bps": 0.0,
+        "outperforms_zero_return_baseline": bool(net and sum(net) > 0),
         "outcomes": outcomes,
         "warning": "Historical walk-forward research only; not a live signal or proof of future edge. Costs are simplified assumptions.",
     }
