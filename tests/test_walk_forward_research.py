@@ -11,7 +11,7 @@ def test_walk_forward_uses_future_only_as_outcome_and_costs_reduce_returns():
     bars = make_bars([1.0, 1.1, 1.2, 1.3, 1.4, 1.5])
     free = evaluate(bars, lookback=1, horizon=1, spread_bps=0, slippage_bps=0)
     costly = evaluate(bars, lookback=1, horizon=1, spread_bps=1, slippage_bps=1)
-    assert free["forecast_count"] == 4
+    assert free["forecast_count"] == 1  # only the final 20% holdout is scored
     assert free["mean_net_return_bps"] > costly["mean_net_return_bps"]
     assert free["research_only"] is True
 
