@@ -246,7 +246,7 @@ async function ingestLatestBars(env) {
       console.log("Ingestion failed for", symbol, error instanceof Error ? error.message : "unknown error");
     }
     try {
-      const healthResponse = await fetch(env.SUPABASE_URL.replace(/\\/$/, "") + "/rest/v1/data_source_health", {
+      const healthResponse = await fetch(env.SUPABASE_URL.replace(/\/$/, "") + "/rest/v1/data_source_health", {
         method:"POST",
         headers:{...supabaseHeaders(env), "Content-Type":"application/json",Prefer:"return=minimal"},
         body:JSON.stringify([{source:"twelvedata",instrument:symbol.replace("/",""),healthy,
