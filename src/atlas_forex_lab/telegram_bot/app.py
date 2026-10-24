@@ -1,15 +1,15 @@
-"""Minimal Telegram interface. No trading or unverified referral claims."""
+"""Minimal EQ Options Telegram interface. No trading or unverified referral claims."""
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 from atlas_forex_lab.telegram_bot.config import BotConfig
 
-DISCLAIMER = ("Atlas Forex Lab is a research tool, not financial advice. Signals are experimental, "
+DISCLAIMER = ("EQ Options is a research tool, not financial advice. Forecasts are experimental, "
               "may be wrong, and are not calibrated probabilities. No live trading is available.")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_message:
         await update.effective_message.reply_text(
-            "Welcome to Atlas Forex Lab.\n\n" + DISCLAIMER + "\n\nCommands: /help /brokers /referral_status")
+            "Welcome to EQ Options.\n\n" + DISCLAIMER + "\n\nCommands: /help /brokers /referral_status")
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_message:
@@ -23,7 +23,7 @@ async def brokers(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not config.broker_links:
         await update.effective_message.reply_text("No broker affiliate links are configured yet.")
         return
-    lines = ["Broker links (the project may earn commission from qualifying referrals):"]
+    lines = ["Broker links (EQ Options may earn commission from qualifying referrals):"]
     lines.extend(f"{label}: {url}" for label, url in config.broker_links)
     await update.effective_message.reply_text("\n".join(lines))
 
