@@ -10,6 +10,7 @@ import argparse
 import csv
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -18,10 +19,11 @@ from urllib.request import Request, urlopen
 FIELDS = ("instrument", "open_time", "close_price")
 
 
-def fetch_page(base_url: str, key: str, offset: int, limit: int) -> list[dict[str, str]]:
+def fetch_page(base_url: str, key: str, offset: int, limit: int, snapshot: str) -> list[dict[str, str]]:
     params = {
         "select": ",".join(FIELDS),
         "timeframe": "eq.M1",
+        "received_at": "lte." + snapshot,
         "order": "instrument.asc,open_time.asc",
         "limit": str(limit),
         "offset": str(offset),
@@ -58,11 +60,12 @@ def export_bars(output: Path, page_size: int = 1000) -> int:
     output.parent.mkdir(parents=True, exist_ok=True)
     count = 0
     offset = 0
+    snapshot = datetime.now(timezone.utc).isoformat()
     with output.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=FIELDS)
         writer.writeheader()
         while True:
-            page = fetch_page(base_url, key, offset, page_size)
+            page = fetch_page(base_url, key, offset, page_size, snapshot)
             for row in page:
                 if not all(field in row for field in FIELDS):
                     raise RuntimeError("Supabase row is missing required candle fields")
