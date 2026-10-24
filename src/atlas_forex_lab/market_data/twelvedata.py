@@ -34,9 +34,10 @@ class TwelveDataProvider(MarketDataProvider):
         symbol = instrument.strip().upper().replace("_", "/").replace("-", "/")
         if symbol == "XAUUSD":
             return "XAU/USD"
+        supported = {"XAU/USD", "EUR/USD", "GBP/USD", "USD/JPY", "AUD/USD", "USD/CAD", "USD/CHF", "NZD/USD"}
         if len(symbol) == 6 and symbol.isalpha() and "/" not in symbol:
-            return f"{symbol[:3]}/{symbol[3:]}"
-        if symbol not in {"XAU/USD", "EUR/USD", "GBP/USD", "USD/JPY", "AUD/USD", "USD/CAD", "USD/CHF", "NZD/USD"}:
+            symbol = f"{symbol[:3]}/{symbol[3:]}"
+        if symbol not in supported:
             raise MarketDataError(f"Unsupported instrument mapping: {instrument}")
         return symbol
 
