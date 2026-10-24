@@ -35,10 +35,11 @@ export default {
         for (const row of barRows) {
           if (!coverage[row.instrument]) coverage[row.instrument] = {
             bars_in_latest_1000:0,latest_bar_at:row.open_time,latest_received_at:row.received_at,
-            gap_count_over_90_seconds:0,last_seen_open_time:row.open_time
+            gap_count_over_90_seconds_under_6_hours:0,last_seen_open_time:row.open_time
           };
           const item = coverage[row.instrument];
-          if (Date.parse(item.last_seen_open_time) - Date.parse(row.open_time) > 90000) item.gap_count_over_90_seconds += 1;
+          const gapSeconds = (Date.parse(item.last_seen_open_time) - Date.parse(row.open_time)) / 1000;
+          if (gapSeconds > 90 && gapSeconds < 21600) item.gap_count_over_90_seconds_under_6_hours += 1;
           item.last_seen_open_time = row.open_time;
           item.bars_in_latest_1000 += 1;
         }
