@@ -35,6 +35,21 @@ export default {
         return Response.json({ok:false,status:"unavailable",reason:diagnostic,diagnostics:safeDiagnostics}, {status:503});
       }
     }
+    if (request.method === "GET" && url.pathname === "/api/ingestion-status") {
+      if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+        return Response.json({ok:false,status:"unavailable",reason:"database_not_configured"},{status:503});
+      }
+      try {
+        const base = env.SUPABASE_URL.replace(/\\/$/, "");
+        const query = new URLSearchParams({select:"source,instrument,checked_at,healthy,latency_ms,details",order:"checked_at.desc",limit:"12"});
+        const response = await fetch(base + "/rest/v1/data_source_health?" + query.toString(), {headers:supabaseHeaders(env)});
+        if (!response.ok) throw new Error("health_query_http_" + response.status);
+        const rows = await response.json();
+        return Response.json({ok:true,status:rows.length ? "records_found" : "no_records",checks:rows});
+      } catch (error) {
+        return Response.json({ok:false,status:"unavailable",reason:error instanceof Error ? error.message : "health_query_failed"},{status:503});
+      }
+    }
     if (request.method === "GET" && url.pathname === "/health") {
       return Response.json({ok:true,service:"eq-options-telegram",brand:"EQ Options",telegramConfigured:Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_WEBHOOK_SECRET)});
     }
@@ -231,12 +246,16 @@ async function ingestLatestBars(env) {
       console.log("Ingestion failed for", symbol, error instanceof Error ? error.message : "unknown error");
     }
     try {
-      await fetch(env.SUPABASE_URL.replace(/\/$/, "") + "/rest/v1/data_source_health", {
+      const healthResponse = await fetch(env.SUPABASE_URL.replace(/\\/$/, "") + "/rest/v1/data_source_health", {
         method:"POST",
         headers:{...supabaseHeaders(env), "Content-Type":"application/json",Prefer:"return=minimal"},
         body:JSON.stringify([{source:"twelvedata",instrument:symbol.replace("/",""),healthy,
           latency_ms:Date.now()-started,details:{interval:"1min"}}])
       });
+      if (!healthResponse.ok) {
+        const errorBody = await healthResponse.text().catch(() => "");
+        console.error("Health write failed", symbol, healthResponse.status, errorBody.slice(0,160));
+      }
     } catch { /* keep scheduled ingestion isolated per instrument */ }
   }
 }
