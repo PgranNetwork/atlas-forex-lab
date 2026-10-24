@@ -144,7 +144,7 @@ async function readLatestBars(env) {
     limit: "100"
   });
   const response = await fetch(base + "/rest/v1/market_bars?" + query.toString(), {
-    headers: {apikey:env.SUPABASE_SERVICE_ROLE_KEY, Authorization:"Bearer " + env.SUPABASE_SERVICE_ROLE_KEY}
+    headers: supabaseHeaders(env)
   });
   if (!response.ok) {
     let code = "unknown";
@@ -204,8 +204,7 @@ async function ingestLatestBars(env) {
       const base = env.SUPABASE_URL.replace(/\/$/, "");
       const responseDb = await fetch(base + "/rest/v1/market_bars?on_conflict=instrument,timeframe,open_time,source", {
         method:"POST",
-        headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:"Bearer " + env.SUPABASE_SERVICE_ROLE_KEY,
-          "Content-Type":"application/json",Prefer:"resolution=ignore-duplicates,return=minimal"},
+        headers:{...supabaseHeaders(env), "Content-Type":"application/json",Prefer:"resolution=ignore-duplicates,return=minimal"},
         body:JSON.stringify(bars)
       });
       if (!responseDb.ok) throw new Error("Database rejected market bars");
@@ -216,11 +215,22 @@ async function ingestLatestBars(env) {
     try {
       await fetch(env.SUPABASE_URL.replace(/\/$/, "") + "/rest/v1/data_source_health", {
         method:"POST",
-        headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:"Bearer " + env.SUPABASE_SERVICE_ROLE_KEY,
-          "Content-Type":"application/json",Prefer:"return=minimal"},
+        headers:{...supabaseHeaders(env), "Content-Type":"application/json",Prefer:"return=minimal"},
         body:JSON.stringify([{source:"twelvedata",instrument:symbol.replace("/",""),healthy,
           latency_ms:Date.now()-started,details:{interval:"1min"}}])
       });
     } catch { /* keep scheduled ingestion isolated per instrument */ }
   }
+}
+
+function supabaseHeaders(env) {
+  const key = env.SUPABASE_SERVICE_ROLE_KEY;
+  const headers = { apikey: key };
+  // Modern Supabase secret keys (sb_secret_...) are opaque API keys, not JWTs.
+  // Sending one as Authorization: Bearer causes Supabase Auth to reject it.
+  // Legacy service_role keys are JWTs and still require the Bearer header.
+  if (typeof key === "string" && !key.startsWith("sb_secret_")) {
+    headers.Authorization = "Bearer " + key;
+  }
+  return headers;
 }
