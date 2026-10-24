@@ -1,43 +1,49 @@
 # Atlas Forex Lab
 
-Open-source, research-only Telegram assistant for forex and gold market analysis. The project is designed to test short-horizon forecasts; it does not place trades or promise profitable signals.
+Open-source, research-only Telegram assistant for forex and gold market analysis. It is intended for short-horizon research and does not place trades or promise profitable signals.
 
-## Current status
+## Current implementation
 
-- Market-data contracts and deterministic synthetic data provider.
-- Optional MetaTrader 5 historical-bar adapter (requires supported Windows environment and MT5 terminal).
-- Baseline momentum forecast for 1–5 one-minute bars ahead.
-- Telegram command layer (requires a bot token configured locally).
-- Affiliate tracking interfaces and a generic signed-webhook prototype.
-- Unit tests for contracts, forecast logic, referral state transitions and webhook signatures.
+- Typed market-data contract with validation for timestamps, OHLC bars and quotes.
+- Deterministic synthetic data provider for demos and tests.
+- Transparent momentum heuristic for 1–5 one-minute bars ahead.
+- Optional Telegram command layer with /start, /help, /brokers and /referral_status.
+- Environment-based configuration; broker links must be explicitly configured.
+- GitHub Actions test workflow.
 
-**Important:** synthetic-data demos are not evidence of forecasting skill. The baseline is a heuristic, not a trained AI model. No broker conversion adapter is live. Do not use this software as financial advice or for unattended live trading.
+Not yet implemented in this repository: live market-data feed, broker-specific affiliate conversion adapter, persistent production referral service, trained AI model, walk-forward backtester, Supabase integration, Cloudflare deployment and live bot configuration.
+
+IMPORTANT: synthetic-data demos are not evidence of forecasting skill. The baseline is a heuristic, not a trained AI model. Referral status remains unverified until authoritative broker reporting is integrated. Do not use this software as financial advice or for unattended live trading.
 
 ## Quick start
 
-Python 3.11 or newer:
+Use Python 3.11 or newer:
 
-```bash
-python -m venv .venv
-# Linux/macOS
-source .venv/bin/activate
-# Windows PowerShell: .venv\Scripts\Activate.ps1
-pip install -e ".[dev]"
-pytest -q
-atlas --source synthetic --instrument EURUSD --timeframe M1 --bars 30
-atlas forecast-demo --instrument EURUSD --bars 30 --horizon 3
-```
+    python -m venv .venv
+    source .venv/bin/activate
+    pip install -e ".[dev]"
+    pytest -q
+    atlas check-data --source synthetic --instrument EURUSD --timeframe M1 --bars 30
+    atlas forecast-demo --instrument EURUSD --bars 30 --horizon 3
 
-Copy `.env.example` to `.env` for local configuration. Never commit real tokens, API keys, broker credentials, or account identifiers.
+To enable Telegram commands, install the optional dependency and configure the token in your local environment:
+
+    pip install -e ".[telegram]"
+    export ATLAS_TELEGRAM_BOT_TOKEN="your-token"
+    atlas-telegram
+
+On Windows PowerShell, set the variable with $env:ATLAS_TELEGRAM_BOT_TOKEN="your-token" instead of export.
+
+Copy .env.example for reference, but do not commit actual tokens, API keys, broker credentials, or account identifiers.
 
 ## Engineering principles
 
 1. Validate any apparent edge using chronological walk-forward evaluation.
 2. Account for spread, commission, slippage, latency and missing/stale data.
-3. Keep broker integrations modular and only claim referral verification from authoritative broker evidence.
+3. Only claim referral verification from authoritative broker evidence.
 4. Never request broker passwords, OTPs or API secrets from end users.
 5. Keep live order placement out of scope.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See LICENSE.
