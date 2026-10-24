@@ -78,12 +78,20 @@ def evaluate(
     outcomes: list[dict] = []
     holdout_start_by_instrument: dict[str, str] = {}
     gap_counts: dict[str, int] = {}
+    skipped_gap_windows_by_instrument: dict[str, int] = {}
     for instrument, series in grouped.items():
         split = max(lookback + 1, int(len(series) * (1.0 - test_fraction)))
         holdout_start_by_instrument[instrument] = series[min(split, len(series) - 1)].timestamp.isoformat() if series else ""
         gaps = sum(1 for left, right in zip(series, series[1:]) if (right.timestamp - left.timestamp).total_seconds() > 90)
         gap_counts[instrument] = gaps
+        skipped_gap_windows = 0
         for origin in range(max(lookback, split), len(series) - horizon):
+            # Never treat a missing-minute jump as a normal one-bar move.
+            window = series[origin - lookback : origin + horizon + 1]
+            if any((right.timestamp - left.timestamp).total_seconds() > 90
+                   for left, right in zip(window, window[1:])):
+                skipped_gap_windows += 1
+                continue
             # Only information up to and including origin is used to create the signal.
             prior = series[origin - lookback].close
             current = series[origin].close
@@ -101,6 +109,7 @@ def evaluate(
                 "net_return_bps": round(net_bps, 5),
                 "directional_hit": bool(signal and ((future > current and signal > 0) or (future < current and signal < 0))),
             })
+        skipped_gap_windows_by_instrument[instrument] = skipped_gap_windows
     active = [o for o in outcomes if o["signal"]]
     net = [o["net_return_bps"] for o in active]
     gross = [o["gross_return_bps"] for o in active]
@@ -113,6 +122,7 @@ def evaluate(
         "holdout_fraction": test_fraction,
         "holdout_start_by_instrument": holdout_start_by_instrument,
         "gap_count_over_90_seconds_by_instrument": gap_counts,
+        "skipped_gap_windows_by_instrument": skipped_gap_windows_by_instrument,
         "assumed_round_trip_cost_bps": cost_bps,
         "forecast_count": len(outcomes),
         "active_signal_count": len(active),
