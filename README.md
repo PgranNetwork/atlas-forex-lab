@@ -1,6 +1,6 @@
-# Atlas Forex Lab
+# EQ Options
 
-Open-source, research-only Telegram assistant for forex and gold market analysis. It is intended for short-horizon research and does not place trades or promise profitable signals.
+Open-source, research-only Telegram assistant for forex and gold market analysis. The public-facing product is **EQ Options** (@Eqoptions_bot); the source repository remains named `atlas-forex-lab`. It is intended for short-horizon research and does not place trades or promise profitable signals.
 
 ## Current implementation
 
