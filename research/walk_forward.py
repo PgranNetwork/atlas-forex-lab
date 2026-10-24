@@ -139,7 +139,7 @@ def main() -> None:
     result = evaluate(load_bars(args.csv), args.lookback, args.horizon, args.spread_bps, args.commission_bps, args.slippage_bps, args.test_fraction)
     rendered = json.dumps(result, indent=2)
     if args.out:
-        args.out.write_text(rendered + "\\n", encoding="utf-8")
+        args.out.write_text(rendered + "\n", encoding="utf-8")
     print(rendered)
 
 
