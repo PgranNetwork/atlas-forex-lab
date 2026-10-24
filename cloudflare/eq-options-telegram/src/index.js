@@ -40,7 +40,7 @@ export default {
         return Response.json({ok:false,status:"unavailable",reason:"database_not_configured"},{status:503});
       }
       try {
-        const base = env.SUPABASE_URL.replace(/\\/$/, "");
+        const base = env.SUPABASE_URL.replace(/\/$/, "");
         const query = new URLSearchParams({select:"source,instrument,checked_at,healthy,latency_ms,details",order:"checked_at.desc",limit:"12"});
         const response = await fetch(base + "/rest/v1/data_source_health?" + query.toString(), {headers:supabaseHeaders(env)});
         if (!response.ok) throw new Error("health_query_http_" + response.status);
@@ -169,7 +169,7 @@ export default {
 function constantTimeEqual(a,b){const e=new TextEncoder(),x=e.encode(a),y=e.encode(b);if(x.length!==y.length)return false;let d=0;for(let i=0;i<x.length;i++)d|=x[i]^y[i];return d===0;}
 
 async function readLatestBars(env) {
-  const base = env.SUPABASE_URL.replace(/\/$/, "");
+        const base = env.SUPABASE_URL.replace(/\/$/, "");
   const query = new URLSearchParams({
     select: "instrument,timeframe,open_time,open_price,high_price,low_price,close_price,source,received_at",
     timeframe: "eq.M1",
@@ -234,7 +234,7 @@ async function ingestLatestBars(env) {
           open_price:open, high_price:high, low_price:low, close_price:close,
           volume:row.volume ? Number(row.volume) : null, source:"twelvedata", received_at:new Date().toISOString()};
       });
-      const base = env.SUPABASE_URL.replace(/\/$/, "");
+        const base = env.SUPABASE_URL.replace(/\/$/, "");
       const responseDb = await fetch(base + "/rest/v1/market_bars?on_conflict=instrument,timeframe,open_time,source", {
         method:"POST",
         headers:{...supabaseHeaders(env), "Content-Type":"application/json",Prefer:"resolution=ignore-duplicates,return=minimal"},
