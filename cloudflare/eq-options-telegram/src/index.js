@@ -13,8 +13,15 @@ export default {
         return Response.json({ok:true,status:rows.length ? "available" : "empty",bars:rows});
       } catch (error) {
         const diagnostic = error instanceof Error ? error.message : "unknown_database_error";
-        console.error("Market API database failure", diagnostic);
-        return Response.json({ok:false,status:"unavailable",reason:diagnostic}, {status:503});
+        const key = typeof env.SUPABASE_SERVICE_ROLE_KEY === "string" ? env.SUPABASE_SERVICE_ROLE_KEY.trim() : "";
+        const url = typeof env.SUPABASE_URL === "string" ? env.SUPABASE_URL.trim() : "";
+        const safeDiagnostics = {
+          key_kind: key.startsWith("sb_secret_") ? "modern_secret" : key.startsWith("eyJ") ? "legacy_jwt" : key ? "unknown_format" : "missing",
+          key_length: key.length,
+          url_project_ref: (() => { try { return new URL(url).hostname.split(".")[0]; } catch { return "invalid_url"; } })()
+        };
+        console.error("Market API database failure", diagnostic, safeDiagnostics);
+        return Response.json({ok:false,status:"unavailable",reason:diagnostic,diagnostics:safeDiagnostics}, {status:503});
       }
     }
     if (request.method === "GET" && url.pathname === "/health") {
