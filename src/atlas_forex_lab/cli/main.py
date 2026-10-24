@@ -56,7 +56,6 @@ def ingest_live(
     bars: int = typer.Option(100, min=1, max=1000),
 ) -> None:
     """Fetch real Twelve Data candles and persist them to Supabase; never uses synthetic data."""
-    import os
     from atlas_forex_lab.market_data.twelvedata import TwelveDataProvider
     from atlas_forex_lab.market_data.supabase_store import SupabaseMarketStore
 
@@ -88,11 +87,11 @@ def ingest_live(
             details={"timeframe": timeframe.value, "bars_received": len(records), "bars_submitted": saved},
         )
         typer.echo(
-            f"source={provider.name}\\ninstrument={instrument.upper()} timeframe={timeframe.value}"
-            f"\\nbars_received={len(records)}\\nbars_submitted={saved}"
-            f"\\nfirst_timestamp={records[0].timestamp.isoformat()}"
-            f"\\nlast_timestamp={records[-1].timestamp.isoformat()}"
-            f"\\nprovider_latency_ms={latency}\\nmode=RESEARCH_ONLY; order_placement=NOT_IMPLEMENTED"
+            f"source={provider.name}\ninstrument={instrument.upper()} timeframe={timeframe.value}"
+            f"\nbars_received={len(records)}\nbars_submitted={saved}"
+            f"\nfirst_timestamp={records[0].timestamp.isoformat()}"
+            f"\nlast_timestamp={records[-1].timestamp.isoformat()}"
+            f"\nprovider_latency_ms={latency}\nmode=RESEARCH_ONLY; order_placement=NOT_IMPLEMENTED"
         )
     except (MarketDataError, ValueError) as exc:
         if store is not None:
