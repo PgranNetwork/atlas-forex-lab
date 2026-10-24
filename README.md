@@ -7,6 +7,8 @@ Open-source, research-only Telegram assistant for forex and gold market analysis
 - Typed market-data contract with validation for timestamps, OHLC bars and quotes.
 - Twelve Data REST adapter for forex and XAU/USD candles with strict response validation.
 - Server-side Supabase REST writer for market bars and data-source health telemetry.
+- Deployed Cloudflare Worker scheduled ingestion every five minutes for EUR/USD, GBP/USD, USD/JPY and XAU/USD; each poll requests the latest ten M1 candles and ignores duplicate inserts.
+- Telegram Markets menu reads stored M1 snapshots and labels candle age; a public ingestion-status endpoint reports secret presence, candle coverage and data-source health.
 - `atlas ingest-live` command that fetches real provider data and persists it only after validation.
 - Deterministic synthetic data provider for demos and tests.
 - Transparent momentum heuristic for 1–5 one-minute bars ahead.
@@ -14,7 +16,7 @@ Open-source, research-only Telegram assistant for forex and gold market analysis
 - Environment-based configuration; broker links must be explicitly configured.
 - GitHub Actions test workflow.
 
-Not yet implemented in this repository: scheduled production ingestion, Telegram-to-data-service runtime wiring, broker-specific affiliate conversion adapter, persistent production referral service, trained AI model, walk-forward backtester, and forecast-to-Telegram integration. The provider adapter requires a valid Twelve Data API key; the database writer requires server-side Supabase credentials.
+Not yet implemented: broker-specific affiliate conversion adapter, persistent production referral service, trained AI model, and forecast-to-Telegram integration. A basic research-only walk-forward evaluator is available in `research/walk_forward.py`; it is not a trained model and should not be treated as evidence of predictive edge. The production Worker currently ingests M1 candles on a five-minute schedule; monitor provider quotas, freshness, and missing-minute gaps before relying on this history for evaluation. The provider adapter requires a valid Twelve Data API key; the database writer requires server-side Supabase credentials.
 
 IMPORTANT: synthetic-data demos are not evidence of forecasting skill. The baseline is a heuristic, not a trained AI model. Referral status remains unverified until authoritative broker reporting is integrated. Do not use this software as financial advice or for unattended live trading.
 
