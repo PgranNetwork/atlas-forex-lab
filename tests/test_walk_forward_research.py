@@ -25,3 +25,17 @@ def test_not_enough_bars_returns_empty_metrics():
     result = evaluate(make_bars([1.0, 1.1]), lookback=2, horizon=1)
     assert result["forecast_count"] == 0
     assert result["mean_net_return_bps"] is None
+
+
+def test_holdout_only_evaluates_later_period_and_reports_gaps():
+    bars = make_bars([1.0 + i * 0.01 for i in range(30)])
+    result = evaluate(bars, lookback=2, horizon=1, test_fraction=0.2)
+    assert result["holdout_fraction"] == 0.2
+    assert result["forecast_count"] > 0
+    assert result["holdout_start_by_instrument"]["EURUSD"] > bars[0].timestamp.isoformat()
+    assert result["gap_count_over_90_seconds_by_instrument"]["EURUSD"] == 0
+
+
+def test_invalid_holdout_fraction_rejected():
+    with pytest.raises(ValueError):
+        evaluate(make_bars([1, 2, 3, 4]), test_fraction=1.0)
