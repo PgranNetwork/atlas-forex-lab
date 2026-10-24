@@ -208,7 +208,7 @@ function formatMarketSnapshot(rows) {
   const now = Date.now();
   const lines = rows.map(row => {
     const age = Math.max(0, Math.round((now - Date.parse(row.open_time)) / 60000));
-    const freshness = age <= 3 ? "FRESH" : age <= 10 ? "DELAYED" : "STALE";
+    const freshness = age <= 7 ? "FRESH" : age <= 15 ? "DELAYED" : "STALE";
     return (row.instrument === "XAUUSD" ? "🟡 " : "💱 ") + row.instrument + " — " + Number(row.close_price).toString() +
       "\n   " + row.timeframe + " · " + freshness + " · candle " + row.open_time;
   });
