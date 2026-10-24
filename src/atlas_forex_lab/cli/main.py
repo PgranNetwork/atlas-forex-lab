@@ -68,7 +68,6 @@ def ingest_live(
         provider = TwelveDataProvider()
         store = SupabaseMarketStore()
         records = provider.fetch_bars(instrument.upper(), timeframe, start, now, limit=bars)
-        # Never persist data that failed basic chronology or OHLC checks.
         timestamps = [record.timestamp for record in records]
         if not records or len(timestamps) != len(set(timestamps)):
             raise MarketDataError("feed returned no bars or duplicate timestamps")
