@@ -247,7 +247,9 @@ async function ingestLatestBars(env) {
           open_price:open, high_price:high, low_price:low, close_price:close,
           volume:row.volume ? Number(row.volume) : null, source:"twelvedata", received_at:new Date().toISOString()};
       });
-        const base = env.SUPABASE_URL.replace(/\/$/, "");
+      barsReceived = bars.length;
+      latestBarAt = bars[0]?.open_time || null;
+      const base = env.SUPABASE_URL.replace(/\/$/, "");
       const responseDb = await fetch(base + "/rest/v1/market_bars?on_conflict=instrument,timeframe,open_time,source", {
         method:"POST",
         headers:{...supabaseHeaders(env), "Content-Type":"application/json",Prefer:"resolution=ignore-duplicates,return=minimal"},
