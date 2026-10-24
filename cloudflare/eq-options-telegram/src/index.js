@@ -226,7 +226,7 @@ async function ingestLatestBars(env) {
     let healthy = false;
     try {
       const params = new URLSearchParams({
-        symbol, interval:"1min", outputsize:"3", order:"ASC", timezone:"UTC", apikey:env.TWELVEDATA_API_KEY
+        symbol, interval:"1min", outputsize:"10", order:"DESC", timezone:"UTC", apikey:env.TWELVEDATA_API_KEY
       });
       const response = await fetch("https://api.twelvedata.com/time_series?" + params.toString());
       const payload = await response.json();
@@ -260,7 +260,7 @@ async function ingestLatestBars(env) {
         method:"POST",
         headers:{...supabaseHeaders(env), "Content-Type":"application/json",Prefer:"return=minimal"},
         body:JSON.stringify([{source:"twelvedata",instrument:symbol.replace("/",""),healthy,
-          latency_ms:Date.now()-started,details:{interval:"1min"}}])
+          latency_ms:Date.now()-started,details:{interval:"1min",bars_received:bars?.length || 0,latest_bar_at:bars?.[0]?.open_time || null}}])
       });
       if (!healthResponse.ok) {
         const errorBody = await healthResponse.text().catch(() => "");
