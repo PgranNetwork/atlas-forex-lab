@@ -225,6 +225,8 @@ async function ingestLatestBars(env) {
   for (const symbol of instruments) {
     const started = Date.now();
     let healthy = false;
+    let barsReceived = 0;
+    let latestBarAt = null;
     try {
       const params = new URLSearchParams({
         symbol, interval:"1min", outputsize:"10", order:"DESC", timezone:"UTC", apikey:env.TWELVEDATA_API_KEY
@@ -261,7 +263,7 @@ async function ingestLatestBars(env) {
         method:"POST",
         headers:{...supabaseHeaders(env), "Content-Type":"application/json",Prefer:"return=minimal"},
         body:JSON.stringify([{source:"twelvedata",instrument:symbol.replace("/",""),healthy,
-          latency_ms:Date.now()-started,details:{interval:"1min",bars_received:bars?.length || 0,latest_bar_at:bars?.[0]?.open_time || null}}])
+          latency_ms:Date.now()-started,details:{interval:"1min",bars_received:barsReceived,latest_bar_at:latestBarAt}}])
       });
       if (!healthResponse.ok) {
         const errorBody = await healthResponse.text().catch(() => "");
