@@ -59,3 +59,14 @@ The command fails closed if credentials are missing, the provider errors, or can
 ## License
 
 MIT. See LICENSE.
+
+
+### Walk-forward baseline evaluation
+
+Export trusted `market_bars` rows to CSV with columns `instrument,open_time,close_price` (OHLC columns may also be included), then run:
+
+```bash
+python -m research.walk_forward candles.csv --lookback 3 --horizon 1 --spread-bps 1 --commission-bps 0 --slippage-bps 1 --out report.json
+```
+
+This evaluates a transparent rolling-momentum baseline in chronological order. Signals at each origin use only information available at that origin; the later close is used only as the outcome. Cost assumptions are simplified basis-point estimates and must be replaced with instrument- and broker-specific estimates before drawing conclusions. Do not interpret this report as a live signal or evidence of future profitability. The baseline must be compared against a no-signal/naive benchmark and tested on a genuinely held-out period before any forecasts are exposed to users.
