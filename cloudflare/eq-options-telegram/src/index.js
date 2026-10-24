@@ -14,7 +14,7 @@ export default {
       const hookUrl=new URL("/telegram",url.origin).toString();
       const result=await fetch("https://api.telegram.org/bot"+env.TELEGRAM_BOT_TOKEN+"/setWebhook",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({url:hookUrl,secret_token:env.TELEGRAM_WEBHOOK_SECRET,allowed_updates:["message"],drop_pending_updates:false})});
       let resultBody={}; try { resultBody=await result.json(); } catch {}
-      if(!result.ok||resultBody.ok!==true){console.error("Telegram setWebhook failed",result.status);return new Response("Telegram could not configure the webhook. Check the token and try again.",{status:502});}
+      if(!result.ok||resultBody.ok!==true){const code=Number(resultBody.error_code)||result.status||502;const description=String(resultBody.description||"No Telegram error description returned").slice(0,240);console.error("Telegram setWebhook failed",code,description);return new Response("Telegram webhook setup failed (code "+code+"): "+description+" . The bot token is never shown here.",{status:502,headers:{"content-type":"text/plain; charset=utf-8","cache-control":"no-store"}});}
       return new Response("Webhook configured successfully. Open Telegram and send /start to @Eqoptions_bot. The setup code should now be treated as sensitive until the maintainer disables setup.",{headers:{"content-type":"text/plain; charset=utf-8","cache-control":"no-store"}});
     }
     if(request.method!=="POST"||url.pathname!=="/telegram") return new Response("Not found",{status:404});
