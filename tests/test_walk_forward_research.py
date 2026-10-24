@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import pytest
 from research.walk_forward import Bar, evaluate
 
@@ -39,7 +39,10 @@ def test_holdout_only_evaluates_later_period_and_reports_gaps():
 
 def test_windows_crossing_missing_minutes_are_excluded():
     bars = make_bars([1.0 + i * 0.01 for i in range(12)])
-    bars[8] = Bar("EURUSD", datetime(2026, 1, 1, 0, 20, tzinfo=timezone.utc), bars[8].close)
+    bars = [
+        Bar(bar.instrument, bar.timestamp + (timedelta(minutes=10) if i >= 8 else timedelta()), bar.close)
+        for i, bar in enumerate(bars)
+    ]
     result = evaluate(bars, lookback=2, horizon=1, test_fraction=0.5)
     assert result["gap_count_over_90_seconds_by_instrument"]["EURUSD"] == 1
     assert result["skipped_gap_windows_by_instrument"]["EURUSD"] > 0
