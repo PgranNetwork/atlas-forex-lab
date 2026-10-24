@@ -65,7 +65,16 @@ MIT. See LICENSE.
 
 ### Walk-forward baseline evaluation
 
-Export trusted `market_bars` rows to CSV with columns `instrument,open_time,close_price` (OHLC columns may also be included), then run:
+For a reproducible export of stored M1 candles, set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in your trusted local environment, then run:
+
+```bash
+python -m research.export_supabase_bars candles.csv
+python -m research.walk_forward candles.csv --lookback 3 --horizon 1 --spread-bps 1 --commission-bps 0 --slippage-bps 1 --out report.json
+```
+
+The exporter reads credentials only from environment variables, uses a fixed receive-time cutoff for a consistent pagination boundary, and never prints secret values. Keep the exported CSV private if your data licence requires it.
+
+The evaluator accepts CSV columns `instrument,open_time,close_price` (OHLC columns may also be included):
 
 ```bash
 python -m research.walk_forward candles.csv --lookback 3 --horizon 1 --spread-bps 1 --commission-bps 0 --slippage-bps 1 --out report.json
