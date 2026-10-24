@@ -4,19 +4,6 @@ export default {
     if (request.method === "GET" && url.pathname === "/health") {
       return Response.json({ok:true,service:"eq-options-telegram",brand:"EQ Options",telegramConfigured:Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_WEBHOOK_SECRET)});
     }
-    if (request.method === "GET" && url.pathname === "/setup") {
-      return new Response(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>EQ Options setup</title></head><body style="font:16px system-ui;max-width:520px;margin:40px auto;padding:16px"><h1>EQ Options bot setup</h1><p>First add the Telegram bot token as the <code>TELEGRAM_BOT_TOKEN</code> secret in Cloudflare. Then enter the one-time setup code supplied by your project maintainer.</p><form method="post" action="/setup"><label for="code">One-time setup code</label><br><input id="code" name="code" required autocomplete="off" style="width:100%;padding:12px;margin:12px 0;box-sizing:border-box"><button style="padding:12px 18px">Configure Telegram webhook</button></form><p>This page never asks for or displays your bot token.</p></body></html>`,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store"}});
-    }
-    if (request.method === "POST" && url.pathname === "/setup") {
-      if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_WEBHOOK_SECRET || !env.SETUP_CODE) return new Response("Required Worker secrets are missing. Configure them in Cloudflare first.",{status:503});
-      let form; try { form=await request.formData(); } catch { return new Response("Invalid form",{status:400}); }
-      if (!constantTimeEqual(String(form.get("code")||""),env.SETUP_CODE)) return new Response("Invalid setup code",{status:403});
-      const hookUrl=new URL("/telegram",url.origin).toString();
-      const result=await fetch("https://api.telegram.org/bot"+env.TELEGRAM_BOT_TOKEN+"/setWebhook",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({url:hookUrl,secret_token:env.TELEGRAM_WEBHOOK_SECRET,allowed_updates:["message"],drop_pending_updates:false})});
-      let resultBody={}; try { resultBody=await result.json(); } catch {}
-      if(!result.ok||resultBody.ok!==true){const code=Number(resultBody.error_code)||result.status||502;const description=String(resultBody.description||"No Telegram error description returned").slice(0,240);console.error("Telegram setWebhook failed",code,description);return new Response("Telegram webhook setup failed (code "+code+"): "+description+" . The bot token is never shown here.",{status:502,headers:{"content-type":"text/plain; charset=utf-8","cache-control":"no-store"}});}
-      return new Response("Webhook configured successfully. Open Telegram and send /start to @Eqoptions_bot. The setup code should now be treated as sensitive until the maintainer disables setup.",{headers:{"content-type":"text/plain; charset=utf-8","cache-control":"no-store"}});
-    }
     if(request.method!=="POST"||url.pathname!=="/telegram") return new Response("Not found",{status:404});
     if(!env.TELEGRAM_BOT_TOKEN||!env.TELEGRAM_WEBHOOK_SECRET) return new Response("Bot not configured",{status:503});
     const suppliedSecret=request.headers.get("X-Telegram-Bot-Api-Secret-Token")||"";
