@@ -11,8 +11,10 @@ export default {
       try {
         const rows = await readLatestBars(env);
         return Response.json({ok:true,status:rows.length ? "available" : "empty",bars:rows});
-      } catch {
-        return Response.json({ok:false,status:"unavailable",reason:"database_request_failed"}, {status:503});
+      } catch (error) {
+        const diagnostic = error instanceof Error ? error.message : "unknown_database_error";
+        console.error("Market API database failure", diagnostic);
+        return Response.json({ok:false,status:"unavailable",reason:diagnostic}, {status:503});
       }
     }
     if (request.method === "GET" && url.pathname === "/health") {
@@ -144,7 +146,15 @@ async function readLatestBars(env) {
   const response = await fetch(base + "/rest/v1/market_bars?" + query.toString(), {
     headers: {apikey:env.SUPABASE_SERVICE_ROLE_KEY, Authorization:"Bearer " + env.SUPABASE_SERVICE_ROLE_KEY}
   });
-  if (!response.ok) throw new Error("Market data query failed");
+  if (!response.ok) {
+    let code = "unknown";
+    try {
+      const error = await response.json();
+      if (typeof error?.code === "string") code = error.code;
+      else if (typeof error?.message === "string") code = error.message.slice(0, 80).replace(/[^a-zA-Z0-9 _-]/g, "");
+    } catch {}
+    throw new Error("supabase_http_" + response.status + "_" + code);
+  }
   const rows = await response.json();
   const latest = new Map();
   for (const row of rows) if (!latest.has(row.instrument)) latest.set(row.instrument, row);
