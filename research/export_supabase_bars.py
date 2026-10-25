@@ -11,6 +11,7 @@ import csv
 import math
 import os
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -62,32 +63,53 @@ def export_bars(output: Path, page_size: int = 1000) -> int:
     count = 0
     offset = 0
     snapshot = datetime.now(timezone.utc).isoformat()
-    with output.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=FIELDS)
-        writer.writeheader()
-        while True:
-            page = fetch_page(base_url, key, offset, page_size, snapshot)
-            for row in page:
-                if not all(field in row for field in FIELDS):
-                    raise RuntimeError("Supabase row is missing required candle fields")
-                try:
-                    prices = {name: float(row[name]) for name in ("open_price", "high_price", "low_price", "close_price")}
-                    if not all(math.isfinite(value) and value > 0 for value in prices.values()):
-                        raise ValueError
-                    if prices["high_price"] < max(prices["open_price"], prices["close_price"]):
-                        raise ValueError
-                    if prices["low_price"] > min(prices["open_price"], prices["close_price"]):
-                        raise ValueError
-                    if prices["high_price"] < prices["low_price"]:
-                        raise ValueError
-                except (TypeError, ValueError, KeyError) as exc:
-                    raise RuntimeError("Supabase returned a candle with invalid OHLC prices") from exc
-                writer.writerow({field: row[field] for field in FIELDS})
-            count += len(page)
-            if len(page) < page_size:
-                break
-            offset += len(page)
-    return count
+    # Build the complete export beside the destination, then atomically replace it.
+    # A network/validation failure must never destroy a previously good dataset.
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            newline="",
+            encoding="utf-8",
+            dir=output.parent,
+            prefix=f".{output.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary_path = Path(handle.name)
+            writer = csv.DictWriter(handle, fieldnames=FIELDS)
+            writer.writeheader()
+            while True:
+                page = fetch_page(base_url, key, offset, page_size, snapshot)
+                for row in page:
+                    if not all(field in row for field in FIELDS):
+                        raise RuntimeError("Supabase row is missing required candle fields")
+                    try:
+                        prices = {name: float(row[name]) for name in ("open_price", "high_price", "low_price", "close_price")}
+                        if not all(math.isfinite(value) and value > 0 for value in prices.values()):
+                            raise ValueError
+                        if prices["high_price"] < max(prices["open_price"], prices["close_price"]):
+                            raise ValueError
+                        if prices["low_price"] > min(prices["open_price"], prices["close_price"]):
+                            raise ValueError
+                        if prices["high_price"] < prices["low_price"]:
+                            raise ValueError
+                    except (TypeError, ValueError, KeyError) as exc:
+                        raise RuntimeError("Supabase returned a candle with invalid OHLC prices") from exc
+                    writer.writerow({field: row[field] for field in FIELDS})
+                count += len(page)
+                if len(page) < page_size:
+                    break
+                offset += len(page)
+        os.replace(temporary_path, output)
+        temporary_path = None
+        return count
+    finally:
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink()
+            except FileNotFoundError:
+                pass
 
 
 def main() -> int:
