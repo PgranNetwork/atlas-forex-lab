@@ -64,3 +64,5 @@ def test_small_sample_is_explicitly_marked_exploratory():
     assert result["bars_by_instrument"]["EURUSD"] == 50
     assert result["minimum_forecast_count_gate"] == 1000
     assert result["minimum_active_signal_count_gate"] == 200
+    assert result["minimum_history_span_days_per_instrument_gate"] == 20
+    assert result["history_gate_met"] is False
