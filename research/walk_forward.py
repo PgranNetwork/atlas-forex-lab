@@ -44,15 +44,16 @@ def load_bars(path: Path) -> list[Bar]:
             except (ValueError, TypeError) as exc:
                 raise ValueError(f"Invalid candle at CSV line {line}") from exc
     bars.sort(key=lambda b: (b.instrument, b.timestamp))
-    deduped: list[Bar] = []
     seen: set[tuple[str, datetime]] = set()
     for bar in bars:
         key = (bar.instrument, bar.timestamp)
         if key in seen:
-            continue
+            raise ValueError(
+                f"Duplicate timestamp for {bar.instrument} at {bar.timestamp.isoformat()}; "
+                "clean the exported dataset before evaluation"
+            )
         seen.add(key)
-        deduped.append(bar)
-    return deduped
+    return bars
 
 
 def evaluate(
