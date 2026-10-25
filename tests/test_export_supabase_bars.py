@@ -58,3 +58,20 @@ def test_export_rejects_invalid_ohlc(monkeypatch, tmp_path):
     ])
     with pytest.raises(RuntimeError, match="invalid OHLC"):
         exporter.export_bars(tmp_path / "bad.csv")
+
+
+def test_failed_export_preserves_existing_file_and_cleans_temp(monkeypatch, tmp_path):
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "test-key")
+    output = tmp_path / "candles.csv"
+    output.write_text("previous-good-export\n", encoding="utf-8")
+
+    def failing_fetch(*args):
+        raise RuntimeError("simulated request failure")
+
+    monkeypatch.setattr(exporter, "fetch_page", failing_fetch)
+    with pytest.raises(RuntimeError, match="simulated request failure"):
+        exporter.export_bars(output)
+
+    assert output.read_text(encoding="utf-8") == "previous-good-export\n"
+    assert list(tmp_path.glob(".candles.csv.*.tmp")) == []
