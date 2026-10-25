@@ -56,3 +56,11 @@ def test_invalid_holdout_fraction_rejected():
 def test_non_finite_costs_rejected():
     with pytest.raises(ValueError):
         evaluate(make_bars([1, 2, 3, 4]), spread_bps=float("nan"))
+
+
+def test_small_sample_is_explicitly_marked_exploratory():
+    result = evaluate(make_bars([1.0 + i * 0.001 for i in range(50)]), lookback=2, horizon=1)
+    assert result["sample_status"] == "exploratory_insufficient_sample"
+    assert result["bars_by_instrument"]["EURUSD"] == 50
+    assert result["minimum_forecast_count_gate"] == 1000
+    assert result["minimum_active_signal_count_gate"] == 200
