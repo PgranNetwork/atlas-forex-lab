@@ -120,7 +120,7 @@ def test_evaluate_rejects_out_of_order_timestamps():
 def test_sample_report_exposes_per_instrument_coverage_gates():
     start = datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)
     eur = [Bar("EURUSD", start + timedelta(minutes=i), 1.1 + i * 0.001) for i in range(40)]
-    gbp = [Bar("GBPUSD", start + timedelta(minutes=i), 1.2 + i * 0.001) for i in range(5)]
+    gbp = [Bar("GBPUSD", start + timedelta(minutes=i), 1.2 + i * 0.001) for i in range(4)]
     result = evaluate(eur + gbp, lookback=2, horizon=1, test_fraction=0.5)
 
     assert result["forecast_count_by_instrument"]["EURUSD"] > 0
