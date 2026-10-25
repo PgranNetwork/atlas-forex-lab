@@ -111,6 +111,15 @@ def evaluate(
             })
         skipped_gap_windows_by_instrument[instrument] = skipped_gap_windows
     active = [o for o in outcomes if o["signal"]]
+    bars_by_instrument = {instrument: len(series) for instrument, series in grouped.items()}
+    holdout_bars_by_instrument = {
+        instrument: max(0, len(series) - max(lookback + 1, int(len(series) * (1.0 - test_fraction))))
+        for instrument, series in grouped.items()
+    }
+    # These are conservative reporting gates, not proof of statistical validity.
+    sample_status = "exploratory_insufficient_sample"
+    if len(outcomes) >= 1000 and len(active) >= 200:
+        sample_status = "minimum_count_gate_met_requires_further_validation"
     net = [o["net_return_bps"] for o in active]
     gross = [o["gross_return_bps"] for o in active]
     wins = sum(v > 0 for v in net)
@@ -124,6 +133,11 @@ def evaluate(
         "gap_count_over_90_seconds_by_instrument": gap_counts,
         "skipped_gap_windows_by_instrument": skipped_gap_windows_by_instrument,
         "assumed_round_trip_cost_bps": cost_bps,
+        "bars_by_instrument": bars_by_instrument,
+        "holdout_bars_by_instrument": holdout_bars_by_instrument,
+        "sample_status": sample_status,
+        "minimum_forecast_count_gate": 1000,
+        "minimum_active_signal_count_gate": 200,
         "forecast_count": len(outcomes),
         "active_signal_count": len(active),
         "directional_accuracy": round(sum(o["directional_hit"] for o in active) / len(active), 4) if active else None,
