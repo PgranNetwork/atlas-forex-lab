@@ -15,11 +15,11 @@ def test_export_uses_fixed_snapshot_and_paginates(monkeypatch, tmp_path):
         calls.append((base_url, key, offset, limit, snapshot))
         if offset == 0:
             return [
-                {"instrument": "EURUSD", "open_time": "2026-01-01T00:00:00+00:00", "close_price": "1.1"},
-                {"instrument": "GBPUSD", "open_time": "2026-01-01T00:00:00+00:00", "close_price": "1.2"},
+                {"instrument": "EURUSD", "open_time": "2026-01-01T00:00:00+00:00", "open_price": "1.0", "high_price": "1.2", "low_price": "0.9", "close_price": "1.1"},
+                {"instrument": "GBPUSD", "open_time": "2026-01-01T00:00:00+00:00", "open_price": "1.1", "high_price": "1.3", "low_price": "1.0", "close_price": "1.2"},
             ]
         return [
-            {"instrument": "USDJPY", "open_time": "2026-01-01T00:00:00+00:00", "close_price": "150.0"}
+            {"instrument": "USDJPY", "open_time": "2026-01-01T00:00:00+00:00", "open_price": "149.8", "high_price": "150.2", "low_price": "149.7", "close_price": "150.0"}
         ]
 
     monkeypatch.setattr(exporter, "fetch_page", fake_fetch_page)
@@ -47,3 +47,14 @@ def test_export_rejects_page_size_out_of_range(monkeypatch, tmp_path):
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "test-key")
     with pytest.raises(ValueError, match="page_size"):
         exporter.export_bars(tmp_path / "candles.csv", page_size=1001)
+
+
+def test_export_rejects_invalid_ohlc(monkeypatch, tmp_path):
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "test-key")
+    monkeypatch.setattr(exporter, "fetch_page", lambda *args: [
+        {"instrument": "EURUSD", "open_time": "2026-01-01T00:00:00+00:00",
+         "open_price": "1.2", "high_price": "1.1", "low_price": "1.0", "close_price": "1.05"}
+    ])
+    with pytest.raises(RuntimeError, match="invalid OHLC"):
+        exporter.export_bars(tmp_path / "bad.csv")
