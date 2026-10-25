@@ -66,3 +66,30 @@ def test_small_sample_is_explicitly_marked_exploratory():
     assert result["minimum_active_signal_count_gate"] == 200
     assert result["minimum_history_span_days_per_instrument_gate"] == 20
     assert result["history_gate_met"] is False
+
+
+def test_duplicate_instrument_timestamp_is_rejected():
+    timestamp = datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)
+    bars = [
+        Bar("EURUSD", timestamp, 1.1),
+        Bar("EURUSD", timestamp, 1.2),
+    ]
+    from research.walk_forward import load_bars
+    from pathlib import Path
+    import csv
+
+    # Exercise the public CSV loader so duplicate rows cannot be hidden in preprocessing.
+    import tempfile
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "duplicates.csv"
+        with path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=["instrument", "open_time", "close_price"])
+            writer.writeheader()
+            for bar in bars:
+                writer.writerow({
+                    "instrument": bar.instrument,
+                    "open_time": bar.timestamp.isoformat(),
+                    "close_price": bar.close,
+                })
+        with pytest.raises(ValueError, match="Duplicate timestamp"):
+            load_bars(path)
