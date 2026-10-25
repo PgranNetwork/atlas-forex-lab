@@ -93,3 +93,25 @@ def test_duplicate_instrument_timestamp_is_rejected():
                 })
         with pytest.raises(ValueError, match="Duplicate timestamp"):
             load_bars(path)
+
+
+def test_evaluate_rejects_duplicate_timestamps_even_without_csv_loader():
+    timestamp = datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)
+    bars = [
+        Bar("EURUSD", timestamp, 1.1),
+        Bar("EURUSD", timestamp, 1.2),
+        Bar("EURUSD", timestamp + timedelta(minutes=1), 1.3),
+    ]
+    with pytest.raises(ValueError, match="strictly increasing, unique timestamps"):
+        evaluate(bars, lookback=1, horizon=1)
+
+
+def test_evaluate_rejects_out_of_order_timestamps():
+    start = datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)
+    bars = [
+        Bar("EURUSD", start + timedelta(minutes=1), 1.2),
+        Bar("EURUSD", start, 1.1),
+        Bar("EURUSD", start + timedelta(minutes=2), 1.3),
+    ]
+    with pytest.raises(ValueError, match="strictly increasing, unique timestamps"):
+        evaluate(bars, lookback=1, horizon=1)
