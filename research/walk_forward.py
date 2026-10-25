@@ -112,14 +112,28 @@ def evaluate(
         skipped_gap_windows_by_instrument[instrument] = skipped_gap_windows
     active = [o for o in outcomes if o["signal"]]
     bars_by_instrument = {instrument: len(series) for instrument, series in grouped.items()}
+    history_span_days_by_instrument = {
+        instrument: round((series[-1].timestamp - series[0].timestamp).total_seconds() / 86400, 3)
+        if len(series) > 1 else 0.0
+        for instrument, series in grouped.items()
+    }
+    distinct_dates_by_instrument = {
+        instrument: len({bar.timestamp.date() for bar in series})
+        for instrument, series in grouped.items()
+    }
     holdout_bars_by_instrument = {
         instrument: max(0, len(series) - max(lookback + 1, int(len(series) * (1.0 - test_fraction))))
         for instrument, series in grouped.items()
     }
-    # These are conservative reporting gates, not proof of statistical validity.
+    # Conservative reporting gates are not proof of statistical validity.
+    count_gate_met = len(outcomes) >= 1000 and len(active) >= 200
+    history_gate_met = bool(grouped) and all(
+        history_span_days_by_instrument[instrument] >= 20
+        for instrument in grouped
+    )
     sample_status = "exploratory_insufficient_sample"
-    if len(outcomes) >= 1000 and len(active) >= 200:
-        sample_status = "minimum_count_gate_met_requires_further_validation"
+    if count_gate_met and history_gate_met:
+        sample_status = "minimum_sample_gates_met_requires_further_validation"
     net = [o["net_return_bps"] for o in active]
     gross = [o["gross_return_bps"] for o in active]
     wins = sum(v > 0 for v in net)
@@ -134,10 +148,15 @@ def evaluate(
         "skipped_gap_windows_by_instrument": skipped_gap_windows_by_instrument,
         "assumed_round_trip_cost_bps": cost_bps,
         "bars_by_instrument": bars_by_instrument,
+        "history_span_days_by_instrument": history_span_days_by_instrument,
+        "distinct_dates_by_instrument": distinct_dates_by_instrument,
         "holdout_bars_by_instrument": holdout_bars_by_instrument,
         "sample_status": sample_status,
         "minimum_forecast_count_gate": 1000,
         "minimum_active_signal_count_gate": 200,
+        "minimum_history_span_days_per_instrument_gate": 20,
+        "count_gate_met": count_gate_met,
+        "history_gate_met": history_gate_met,
         "forecast_count": len(outcomes),
         "active_signal_count": len(active),
         "directional_accuracy": round(sum(o["directional_hit"] for o in active) / len(active), 4) if active else None,
