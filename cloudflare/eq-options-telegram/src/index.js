@@ -14,7 +14,7 @@ export default {
       } catch (error) {
         const diagnostic = error instanceof Error ? error.message : "unknown_database_error";
         console.error("Market API database failure", diagnostic);
-        return Response.json({ok:false,status:"unavailable",reason:diagnostic}, {status:503});
+        return Response.json({ok:false,status:"unavailable",reason:"market_data_query_failed"}, {status:503});
       }
     }
     if (request.method === "GET" && url.pathname === "/api/ingestion-status") {
@@ -59,7 +59,9 @@ export default {
           checks:rows
         });
       } catch (error) {
-        return Response.json({ok:false,status:"unavailable",reason:error instanceof Error ? error.message : "health_query_failed"},{status:503});
+        const diagnostic = error instanceof Error ? error.message : "health_query_failed";
+        console.error("Ingestion status query failed", diagnostic);
+        return Response.json({ok:false,status:"unavailable",reason:"ingestion_status_query_failed"},{status:503});
       }
     }
     if (request.method === "GET" && url.pathname === "/health") {
