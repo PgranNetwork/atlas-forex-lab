@@ -72,9 +72,9 @@ python -m research.export_supabase_bars candles.csv
 python -m research.walk_forward candles.csv --lookback 3 --horizon 1 --spread-bps 1 --commission-bps 0 --slippage-bps 1 --out report.json
 ```
 
-The exporter reads credentials only from environment variables, uses a fixed receive-time cutoff for a consistent pagination boundary, and never prints secret values. Keep the exported CSV private if your data licence requires it.
+The exporter reads credentials only from environment variables, uses a fixed receive-time cutoff for a consistent pagination boundary, exports full OHLC candles, and rejects non-finite, non-positive or inconsistent price rows. It never prints secret values. Keep the exported CSV private if your data licence requires it.
 
-The evaluator accepts CSV columns `instrument,open_time,close_price` (OHLC columns may also be included):
+The exporter writes `instrument,open_time,open_price,high_price,low_price,close_price`; the evaluator requires `instrument,open_time,close_price` and safely ignores the additional OHLC columns:
 
 ```bash
 python -m research.walk_forward candles.csv --lookback 3 --horizon 1 --spread-bps 1 --commission-bps 0 --slippage-bps 1 --out report.json
