@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import math
 import os
 import sys
 from datetime import datetime, timezone
@@ -16,7 +17,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-FIELDS = ("instrument", "open_time", "close_price")
+FIELDS = ("instrument", "open_time", "open_price", "high_price", "low_price", "close_price")
 
 
 def fetch_page(base_url: str, key: str, offset: int, limit: int, snapshot: str) -> list[dict[str, str]]:
@@ -69,6 +70,18 @@ def export_bars(output: Path, page_size: int = 1000) -> int:
             for row in page:
                 if not all(field in row for field in FIELDS):
                     raise RuntimeError("Supabase row is missing required candle fields")
+                try:
+                    prices = {name: float(row[name]) for name in ("open_price", "high_price", "low_price", "close_price")}
+                    if not all(math.isfinite(value) and value > 0 for value in prices.values()):
+                        raise ValueError
+                    if prices["high_price"] < max(prices["open_price"], prices["close_price"]):
+                        raise ValueError
+                    if prices["low_price"] > min(prices["open_price"], prices["close_price"]):
+                        raise ValueError
+                    if prices["high_price"] < prices["low_price"]:
+                        raise ValueError
+                except (TypeError, ValueError, KeyError) as exc:
+                    raise RuntimeError("Supabase returned a candle with invalid OHLC prices") from exc
                 writer.writerow({field: row[field] for field in FIELDS})
             count += len(page)
             if len(page) < page_size:
