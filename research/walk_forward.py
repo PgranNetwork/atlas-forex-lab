@@ -76,6 +76,14 @@ def evaluate(
     grouped: dict[str, list[Bar]] = {}
     for bar in bars:
         grouped.setdefault(bar.instrument, []).append(bar)
+    # evaluate() is also a public Python API; do not rely on callers having used
+    # load_bars(), since duplicate/out-of-order timestamps corrupt gap checks.
+    for instrument, series in grouped.items():
+        timestamps = [bar.timestamp for bar in series]
+        if any(right <= left for left, right in zip(timestamps, timestamps[1:])):
+            raise ValueError(
+                f"Bars for {instrument} must have strictly increasing, unique timestamps"
+            )
     outcomes: list[dict] = []
     holdout_start_by_instrument: dict[str, str] = {}
     gap_counts: dict[str, int] = {}
