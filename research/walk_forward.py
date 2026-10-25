@@ -134,8 +134,23 @@ def evaluate(
         instrument: max(0, len(series) - max(lookback + 1, int(len(series) * (1.0 - test_fraction))))
         for instrument, series in grouped.items()
     }
-    # Conservative reporting gates are not proof of statistical validity.
-    count_gate_met = len(outcomes) >= 1000 and len(active) >= 200
+    forecast_counts_by_instrument = {
+        instrument: sum(1 for outcome in outcomes if outcome["instrument"] == instrument)
+        for instrument in grouped
+    }
+    active_counts_by_instrument = {
+        instrument: sum(1 for outcome in active if outcome["instrument"] == instrument)
+        for instrument in grouped
+    }
+    # Aggregate counts alone can hide an instrument with almost no usable data.
+    # These gates are conservative reporting checks, not proof of statistical validity.
+    count_gate_met = (
+        len(outcomes) >= 1000
+        and len(active) >= 200
+        and bool(grouped)
+        and all(forecast_counts_by_instrument[instrument] >= 100 for instrument in grouped)
+        and all(active_counts_by_instrument[instrument] >= 20 for instrument in grouped)
+    )
     history_gate_met = bool(grouped) and all(
         history_span_days_by_instrument[instrument] >= 20
         for instrument in grouped
@@ -160,6 +175,10 @@ def evaluate(
         "history_span_days_by_instrument": history_span_days_by_instrument,
         "distinct_dates_by_instrument": distinct_dates_by_instrument,
         "holdout_bars_by_instrument": holdout_bars_by_instrument,
+        "forecast_count_by_instrument": forecast_counts_by_instrument,
+        "active_signal_count_by_instrument": active_counts_by_instrument,
+        "minimum_forecast_count_per_instrument_gate": 100,
+        "minimum_active_signal_count_per_instrument_gate": 20,
         "sample_status": sample_status,
         "minimum_forecast_count_gate": 1000,
         "minimum_active_signal_count_gate": 200,
